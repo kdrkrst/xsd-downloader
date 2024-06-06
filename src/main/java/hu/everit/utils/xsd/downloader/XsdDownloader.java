@@ -3,6 +3,10 @@ package hu.everit.utils.xsd.downloader;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -111,6 +115,16 @@ public class XsdDownloader
     private void downloadXsdRecurse(final String xsdUrl)
         throws IOException, ParserConfigurationException, SAXException, TransformerException
     {
+        String username = "yourUsername";
+        String password = "yourPassword";
+
+         // Create the authorization header
+        String auth = username + ":" + password;
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
+
+        URL url = new URL(xsdUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
 
         String outputFileName = downloadPrefix;
         if (fileNamesByprocessedUrls.size() > 0)
@@ -123,16 +137,18 @@ public class XsdDownloader
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         dbf.setNamespaceAware(true);
         DocumentBuilder db = dbf.newDocumentBuilder();
-        Document doc = db.parse(xsdUrl);
+        
+        try (InputStream is = connection.getInputStream()) {
+            Document doc = db.parse(is);
+            processElementRecurse(doc.getDocumentElement());
 
-        processElementRecurse(doc.getDocumentElement());
-
-        File outputFile = new File(outputFileName);
-        TransformerFactory trf = TransformerFactory.newInstance();
-        Transformer tr = trf.newTransformer();
-        Source source = new DOMSource(doc);
-        Result result = new StreamResult(outputFile);
-        tr.transform(source, result);
+            File outputFile = new File(outputFileName);
+            TransformerFactory trf = TransformerFactory.newInstance();
+            Transformer tr = trf.newTransformer();
+            Source source = new DOMSource(doc);
+            Result result = new StreamResult(outputFile);
+            tr.transform(source, result);
+        }
     }
 
     private void processElementRecurse(final Element node)
